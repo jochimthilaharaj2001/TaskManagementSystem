@@ -1,6 +1,10 @@
-﻿namespace taskManagementBE.Services.Interfaces
+﻿using taskManagementBE.DTOs;
+using taskManagementBE.Models;
+
+namespace taskManagementBE.Services.Interfaces
 {
-    public class IUserService
+    public interface IUserService
     {
+        ApiResponse<User> AddUser(CreateUserDto dto);
     }
 }

@@ -1,4 +1,9 @@
 
+using taskManagementBE.Repositories.Implementations;
+using taskManagementBE.Repositories.Interfaces;
+using taskManagementBE.Services.Implementations;
+using taskManagementBE.Services.Interfaces;
+
 namespace taskManagementBE
 {
     public class Program
@@ -13,6 +18,11 @@ namespace taskManagementBE
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+
+           
+            builder.Services.AddScoped<IUserService, UserService>();
+
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
 
             var app = builder.Build();
 
