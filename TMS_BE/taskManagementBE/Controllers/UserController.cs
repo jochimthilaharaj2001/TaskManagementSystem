@@ -16,17 +16,44 @@ namespace taskManagementBE.Controllers
             _userService = userService;
         }
 
+        [HttpGet]
+        public IActionResult GetAllUsers()
+        {
+            var result = _userService.GetAllUsers();
+            return Ok(result);
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult GetUserById(int id)
+        {
+            var result = _userService.GetUserById(id);
+
+            if (!result.Success)
+                return NotFound(result);
+
+            return Ok(result);
+        }
+
         [HttpPost]
-        public IActionResult AddUser(CreateUserDto dto)
+        public IActionResult AddUser([FromBody] CreateUserDto dto)
         {
             var result = _userService.AddUser(dto);
 
             if (!result.Success)
-            {
                 return BadRequest(result);
-            }
 
             return Created("", result);
+        }
+
+        [HttpGet("{id}/tasks")]
+        public IActionResult GetUserWithTasks(int id)
+        {
+            var result = _userService.GetUserWithTasks(id);
+
+            if (!result.Success)
+                return NotFound(result);
+
+            return Ok(result);
         }
 
     }

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Task - Task Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="layout-sidebar"></aside>
+        <div id="layout-overlay"></div>
+
+        <!-- Main Window -->
+        <main class="main-content">
+            <div class="page-header">
+                <div class="page-title">
+                    <a href="tasks.html" style="color: var(--text-muted); font-size: 0.875rem; text-decoration: none; display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                        Back to Tasks
+                    </a>
+                    <h1>Create Task</h1>
+                    <p>Establish a new task item and assign ownership to a team member</p>
+                </div>
+            </div>
+
+            <div class="content-grid" style="max-width: 650px;">
+                <div class="card">
+                    <h3 class="form-title">
+                        <svg style="width: 20px; height: 20px; color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                        </svg>
+                        Task Definition Form
+                    </h3>
+                    
+                    <form id="create-task-form" novalidate>
+                        <!-- Title -->
+                        <div class="form-group">
+                            <label for="task-title">Task Title</label>
+                            <input type="text" id="task-title" class="form-control" placeholder="Specify task name (e.g. Design Landing Page)" required>
+                            <span class="error-text" id="title-error">Task Title is required (max 200 chars).</span>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="form-group">
+                            <label for="task-desc">Description (Optional)</label>
+                            <textarea id="task-desc" class="form-control" placeholder="Provide detailed objectives and instructions..."></textarea>
+                            <span class="error-text" id="desc-error">Description is too long (max 500 chars).</span>
+                        </div>
+
+                        <!-- Grid for User & Status -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Assigned User -->
+                            <div class="form-group">
+                                <label for="task-user">Assigned User</label>
+                                <select id="task-user" class="form-control" required>
+                                    <option value="" disabled selected>Select Assignee...</option>
+                                </select>
+                                <span class="error-text" id="user-error">An assignee must be selected.</span>
+                            </div>
+
+                            <!-- Initial Status -->
+                            <div class="form-group">
+                                <label for="task-status">Status</label>
+                                <select id="task-status" class="form-control" required>
+                                    <option value="Todo" selected>Todo</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Done">Done</option>
+                                </select>
+                                <span class="error-text" id="status-error">Invalid status selection.</span>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                            <a href="tasks.html" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary" id="submit-task-btn">
+                                Save Task Item
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            renderLayout('tasks');
+            populateUserDropdown();
+
+            const form = document.getElementById('create-task-form');
+            form.addEventListener('submit', handleAddTaskSubmit);
+
+            // Input monitors for instant validation response
+            document.getElementById('task-title').addEventListener('input', validateTaskTitle);
+            document.getElementById('task-desc').addEventListener('input', validateTaskDescription);
+            document.getElementById('task-user').addEventListener('change', validateAssignee);
+        });
+
+        // Validation constraints
+        function validateTaskTitle() {
+            return validateField(
+                'task-title',
+                (val) => val.length > 0 && val.length <= 200,
+                'title-error',
+                'Task title is required and cannot exceed 200 characters.'
+            );
+        }
+
+        function validateTaskDescription() {
+            return validateField(
+                'task-desc',
+                (val) => val.length <= 500,
+                'desc-error',
+                'Description cannot exceed 500 characters.'
+            );
+        }
+
+        function validateAssignee() {
+            return validateField(
+                'task-user',
+                (val) => val !== "" && val !== null,
+                'user-error',
+                'An active user must be assigned to this task.'
+            );
+        }
+
+        async function populateUserDropdown() {
+            const selectEl = document.getElementById('task-user');
+            
+            // Call API GET /api/users
+            const response = await apiFetch('/api/users');
+
+            if (!response || !response.success || !response.data) {
+                selectEl.innerHTML = `<option value="" disabled>Error loading users</option>`;
+                return;
+            }
+
+            const users = response.data;
+
+            if (users.length === 0) {
+                selectEl.innerHTML = `<option value="" disabled>No users registered</option>`;
+                return;
+            }
+
+            // Keep default placeholder
+            selectEl.innerHTML = '<option value="" disabled selected>Select Assignee...</option>' + 
+                users.map(u => `<option value="${u.userId}">${escapeHtml(u.userName)} (${escapeHtml(u.email)})</option>`).join('');
+
+            // Optional auto-select based on query parameters (from user details direct create link)
+            const preselectedUserId = getQueryParam('userId');
+            if (preselectedUserId) {
+                selectEl.value = preselectedUserId;
+            }
+        }
+
+        async function handleAddTaskSubmit(e) {
+            e.preventDefault();
+
+            // Run validation check
+            const isTitleValid = validateTaskTitle();
+            const isDescValid = validateTaskDescription();
+            const isUserValid = validateAssignee();
+
+            if (!isTitleValid || !isDescValid || !isUserValid) {
+                showToast('error', 'Form Invalid', 'Please check validation highlights and correct errors.');
+                return;
+            }
+
+            const title = document.getElementById('task-title').value.trim();
+            const description = document.getElementById('task-desc').value.trim();
+            const userId = parseInt(document.getElementById('task-user').value);
+            const status = document.getElementById('task-status').value;
+            const submitBtn = document.getElementById('submit-task-btn');
+
+            // Call API POST /api/tasks
+            const response = await apiFetch('/api/tasks', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title,
+                    description,
+                    status,
+                    userId
+                }),
+                submitButton: submitBtn
+            });
+
+            if (response && response.success) {
+                showToast('success', 'Task Created', `Task "${title}" created successfully!`);
+                
+                // Reset form or navigate
+                setTimeout(() => {
+                    window.location.href = 'tasks.html';
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

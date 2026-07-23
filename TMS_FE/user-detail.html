@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details - Task Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="layout-sidebar"></aside>
+        <div id="layout-overlay"></div>
+
+        <!-- Main Window -->
+        <main class="main-content">
+            <div class="page-header">
+                <div class="page-title">
+                    <a href="users.html" style="color: var(--text-muted); font-size: 0.875rem; text-decoration: none; display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                        Back to Users
+                    </a>
+                    <h1>User Details</h1>
+                    <p>Inspect user profile details and task workloads</p>
+                </div>
+            </div>
+
+            <!-- Profile Overview Header -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="user-profile-header" id="user-profile-loader">
+                    <span class="loading-spinner"></span> Loading user details...
+                </div>
+                <div class="user-profile-header" id="user-profile-content" style="display: none;">
+                    <div class="user-avatar" id="user-initials">U</div>
+                    <div class="user-meta">
+                        <h2 id="detail-username">-</h2>
+                        <p id="detail-email">-</p>
+                        <p style="margin-top: 0.5rem; font-weight: 600; color: var(--primary);" id="detail-count">0 tasks assigned</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task List Card -->
+            <div class="card">
+                <h3 class="form-title">
+                    <svg style="width: 20px; height: 20px; color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    Assigned Task Workflow
+                </h3>
+                
+                <div class="table-container">
+                    <table id="user-tasks-table" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th>Task Title</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Created Date</th>
+                                <th style="width: 140px;">Status Action</th>
+                                <th style="width: 150px; text-align: center;">Controls</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-tasks-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="user-tasks-empty" style="display: none;" class="empty-state">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <h3>No tasks assigned</h3>
+                    <p>This user does not have any tasks active. Click below to add a new task and assign it to them.</p>
+                    <a href="add-task.html" class="btn btn-primary btn-sm" id="assign-task-direct">Assign First Task</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let currentUserId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderLayout('users'); // Users remains active parent highlight
+            currentUserId = getQueryParam('id');
+            if (currentUserId) {
+                getUserWithTasks(currentUserId);
+            } else {
+                showToast('error', 'Error', 'No User ID provided in URL');
+                document.getElementById('user-profile-loader').textContent = 'No user specified.';
+            }
+        });
+
+        async function getUserWithTasks(userId) {
+            const profileLoader = document.getElementById('user-profile-loader');
+            const profileContent = document.getElementById('user-profile-content');
+            const tasksTable = document.getElementById('user-tasks-table');
+            const tasksEmpty = document.getElementById('user-tasks-empty');
+            const tasksBody = document.getElementById('user-tasks-body');
+
+            // Call API GET /api/users/{id}/tasks
+            const response = await apiFetch(`/api/users/${userId}/tasks`);
+
+            if (!response || !response.success || !response.data) {
+                profileLoader.innerHTML = `<span style="color: var(--danger);">Failed to load profile.</span>`;
+                return;
+            }
+
+            const userData = response.data;
+            profileLoader.style.display = 'none';
+            profileContent.style.display = 'flex';
+
+            // Fill user details
+            document.getElementById('detail-username').textContent = userData.userName;
+            document.getElementById('detail-email').textContent = userData.email;
+            
+            // Set Avatar initials
+            const initials = userData.userName ? userData.userName.substring(0, 2).toUpperCase() : 'U';
+            document.getElementById('user-initials').textContent = initials;
+
+            // Direct link to create task pre-selecting this user
+            const directLink = document.getElementById('assign-task-direct');
+            if (directLink) {
+                directLink.href = `add-task.html?userId=${userData.userId}`;
+            }
+
+            const tasks = userData.tasks || [];
+            document.getElementById('detail-count').textContent = `${tasks.length} task${tasks.length === 1 ? '' : 's'} assigned`;
+
+            if (tasks.length === 0) {
+                tasksTable.style.display = 'none';
+                tasksEmpty.style.display = 'block';
+                return;
+            }
+
+            tasksEmpty.style.display = 'none';
+            tasksTable.style.display = 'table';
+
+            tasksBody.innerHTML = tasks.map(t => `
+                <tr>
+                    <td style="font-weight: 600;">${escapeHtml(t.title)}</td>
+                    <td style="color: var(--text-secondary); max-width: 280px; overflow-wrap: break-word; white-space: normal;">
+                        ${escapeHtml(t.description || 'No description')}
+                    </td>
+                    <td>
+                        <span class="badge ${getStatusBadgeClass(t.status)}">${escapeHtml(t.status)}</span>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">
+                        ${formatDate(t.createdDate)}
+                    </td>
+                    <td>
+                        <select class="form-control btn-sm" onchange="updateTaskStatus(${t.taskId}, this)" style="padding: 0.25rem 1.5rem 0.25rem 0.5rem; font-size: 0.75rem;">
+                            <option value="Todo" ${t.status === 'Todo' ? 'selected' : ''}>Todo</option>
+                            <option value="In Progress" ${t.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Done" ${t.status === 'Done' ? 'selected' : ''}>Done</option>
+                        </select>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="actions-cell" style="justify-content: center;">
+                            <a href="edit-task.html?id=${t.taskId}" class="btn btn-secondary btn-sm" title="Edit Task">
+                                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                </svg>
+                            </a>
+                            <button class="btn btn-danger btn-sm" onclick="confirmDelete(${t.taskId}, '${escapeHtml(t.title)}')"" title="Delete Task">
+                                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function updateTaskStatus(taskId, selectEl) {
+            const status = selectEl.value;
+            
+            // Call API PUT /api/tasks/{id}/status
+            const response = await apiFetch(`/api/tasks/${taskId}/status`, {
+                method: 'PUT',
+                body: JSON.stringify({ status })
+            });
+
+            if (response && response.success) {
+                showToast('success', 'Status Updated', `Task status changed to "${status}".`);
+                getUserWithTasks(currentUserId); // Reload list and statistics
+            } else {
+                // Revert
+                getUserWithTasks(currentUserId);
+            }
+        }
+
+        function confirmDelete(taskId, title) {
+            showConfirmModal(
+                'Delete Task',
+                `Are you sure you want to delete the task "${title}"? This action is permanent.`,
+                () => deleteTask(taskId)
+            );
+        }
+
+        async function deleteTask(taskId) {
+            // Call API DELETE /api/tasks/{id}
+            const response = await apiFetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            });
+
+            if (response && response.success) {
+                showToast('success', 'Task Deleted', 'The task was successfully deleted.');
+                getUserWithTasks(currentUserId); // Reload user workload
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            const s = (status || '').toLowerCase();
+            if (s === 'todo') return 'badge-todo';
+            if (s === 'in progress') return 'badge-in-progress';
+            if (s === 'done') return 'badge-done';
+            return '';
+        }
+    </script>
+</body>
+</html>

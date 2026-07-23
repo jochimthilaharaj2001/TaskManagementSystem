@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks - Task Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="layout-sidebar"></aside>
+        <div id="layout-overlay"></div>
+
+        <!-- Main Window -->
+        <main class="main-content">
+            <div class="page-header">
+                <div class="page-title">
+                    <h1>Tasks</h1>
+                    <p>Search, manage, and process tasks across the organization</p>
+                </div>
+                <div class="header-actions">
+                    <a href="add-task.html" class="btn btn-primary">
+                        <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Add Task
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tasks Filter Bar -->
+            <div class="filter-bar">
+                <div class="search-input-container">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input type="text" id="search-input" class="form-control" placeholder="Search tasks by title..." autocomplete="off">
+                </div>
+            </div>
+
+            <!-- Task List Table -->
+            <div class="card">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Description</th>
+                                <th>Assigned User</th>
+                                <th>Status</th>
+                                <th>Created Date</th>
+                                <th style="width: 140px;">Status Action</th>
+                                <th style="width: 120px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasks-table-body">
+                            <tr>
+                                <td colspan="7" class="table-loading">
+                                    <span class="loading-spinner"></span> Loading task board...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let searchTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderLayout('tasks');
+            loadTasks();
+
+            // Search input keyup/input handler
+            const searchInput = document.getElementById('search-input');
+            searchInput.addEventListener('input', handleSearchInput);
+        });
+
+        async function loadTasks() {
+            const tbody = document.getElementById('tasks-table-body');
+            
+            // Call API GET /api/tasks
+            const response = await apiFetch('/api/tasks');
+
+            renderTasksList(response, tbody);
+        }
+
+        async function searchTasks(keyword) {
+            const tbody = document.getElementById('tasks-table-body');
+            
+            // Call API GET /api/tasks/search?name=value
+            const response = await apiFetch(`/api/tasks/search?name=${encodeURIComponent(keyword)}`);
+            
+            renderTasksList(response, tbody);
+        }
+
+        function renderTasksList(response, tbody) {
+            if (!response || !response.success || !response.data) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="table-loading" style="color: var(--danger);">
+                            Failed to load tasks. Verify connection to the server API.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const tasks = response.data;
+
+            if (tasks.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="table-loading">
+                            No tasks found matching your workspace context.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = tasks.map(t => `
+                <tr>
+                    <td style="font-weight: 600;">${escapeHtml(t.title)}</td>
+                    <td style="color: var(--text-secondary); max-width: 250px; overflow-wrap: break-word; white-space: normal;">
+                        ${escapeHtml(t.description || 'No description')}
+                    </td>
+                    <td>
+                        <a href="user-detail.html?id=${t.userId}" style="color: var(--primary); font-weight: 500; text-decoration: none;">
+                            ${escapeHtml(t.userName || 'Unassigned')}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge ${getStatusBadgeClass(t.status)}">${escapeHtml(t.status)}</span>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">
+                        ${formatDate(t.createdDate)}
+                    </td>
+                    <td>
+                        <select class="form-control btn-sm" onchange="updateTaskStatus(${t.taskId}, this)" style="padding: 0.25rem 1.5rem 0.25rem 0.5rem; font-size: 0.75rem;">
+                            <option value="Todo" ${t.status === 'Todo' ? 'selected' : ''}>Todo</option>
+                            <option value="In Progress" ${t.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Done" ${t.status === 'Done' ? 'selected' : ''}>Done</option>
+                        </select>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="actions-cell" style="justify-content: center;">
+                            <a href="edit-task.html?id=${t.taskId}" class="btn btn-secondary btn-sm" title="Edit Task">
+                                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                </svg>
+                            </a>
+                            <button class="btn btn-danger btn-sm" onclick="confirmDelete(${t.taskId}, '${escapeHtml(t.title)}')"" title="Delete Task">
+                                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function handleSearchInput(e) {
+            const val = e.target.value.trim();
+
+            clearTimeout(searchTimeout);
+
+            searchTimeout = setTimeout(() => {
+                if (val === '') {
+                    // Call loadTasks() if empty
+                    loadTasks();
+                } else {
+                    // Call searchTasks() if typing
+                    searchTasks(val);
+                }
+            }, 300); // 300ms debounce
+        }
+
+        async function updateTaskStatus(taskId, selectEl) {
+            const status = selectEl.value;
+            
+            // Call API PUT /api/tasks/{id}/status
+            const response = await apiFetch(`/api/tasks/${taskId}/status`, {
+                method: 'PUT',
+                body: JSON.stringify({ status })
+            });
+
+            if (response && response.success) {
+                showToast('success', 'Status Updated', `Task status changed to "${status}".`);
+                refreshCurrentView(); // Refresh list to match database status
+            } else {
+                // Revert
+                refreshCurrentView();
+            }
+        }
+
+        function confirmDelete(taskId, title) {
+            showConfirmModal(
+                'Delete Task',
+                `Are you sure you want to delete the task "${title}"? This action cannot be undone.`,
+                () => deleteTask(taskId)
+            );
+        }
+
+        async function deleteTask(taskId) {
+            // Call API DELETE /api/tasks/{id}
+            const response = await apiFetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            });
+
+            if (response && response.success) {
+                showToast('success', 'Task Deleted', 'The task has been deleted.');
+                refreshCurrentView();
+            }
+        }
+
+        function refreshCurrentView() {
+            const val = document.getElementById('search-input').value.trim();
+            if (val === '') {
+                loadTasks();
+            } else {
+                searchTasks(val);
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            const s = (status || '').toLowerCase();
+            if (s === 'todo') return 'badge-todo';
+            if (s === 'in progress') return 'badge-in-progress';
+            if (s === 'done') return 'badge-done';
+            return '';
+        }
+    </script>
+</body>
+</html>

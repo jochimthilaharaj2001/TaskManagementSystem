@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - Task Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="layout-sidebar"></aside>
+        <div id="layout-overlay"></div>
+
+        <!-- Main Window -->
+        <main class="main-content">
+            <div class="page-header">
+                <div class="page-title">
+                    <h1>Users</h1>
+                    <p>Manage application users, add members, and inspect task assignments</p>
+                </div>
+            </div>
+
+            <!-- Page Specific Split Layout -->
+            <div class="content-grid-split">
+                
+                <!-- Left: Add User Form -->
+                <div class="card" style="height: fit-content;">
+                    <h3 class="form-title">
+                        <svg style="width: 20px; height: 20px; color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                        </svg>
+                        Add New User
+                    </h3>
+                    <form id="add-user-form" novalidate>
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" class="form-control" placeholder="Enter username (e.g. John Doe)" required>
+                            <span class="error-text" id="username-error">Username is required (max 100 chars).</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" class="form-control" placeholder="Enter email address" required>
+                            <span class="error-text" id="email-error">Enter a valid email address (max 100 chars).</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;" id="submit-user-btn">
+                            Create User Account
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right: Users Table -->
+                <div class="card">
+                    <h3 class="form-title">
+                        <svg style="width: 20px; height: 20px; color: var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                        </svg>
+                        Registered Users
+                    </h3>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">User ID</th>
+                                    <th>Username</th>
+                                    <th>Email Address</th>
+                                    <th style="width: 150px; text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="4" class="table-loading">
+                                        <span class="loading-spinner"></span> Fetching user list...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            renderLayout('users');
+            loadUsers();
+
+            const form = document.getElementById('add-user-form');
+            form.addEventListener('submit', handleAddUser);
+
+            // Real-time validations
+            document.getElementById('username').addEventListener('input', validateUserName);
+            document.getElementById('email').addEventListener('input', validateEmail);
+        });
+
+        // Field Validator for Username
+        function validateUserName() {
+            return validateField(
+                'username',
+                (val) => val.length > 0 && val.length <= 100,
+                'username-error',
+                'Username is required and must not exceed 100 characters.'
+            );
+        }
+
+        // Field Validator for Email
+        function validateEmail() {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return validateField(
+                'email',
+                (val) => val.length > 0 && val.length <= 100 && emailRegex.test(val),
+                'email-error',
+                'Please enter a valid unique email address (max 100 characters).'
+            );
+        }
+
+        async function loadUsers() {
+            const tbody = document.getElementById('users-table-body');
+            
+            // Call API GET /api/users
+            const response = await apiFetch('/api/users');
+
+            if (!response || !response.success || !response.data) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="table-loading" style="color: var(--danger);">
+                            Failed to load users list. Check backend connections.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const users = response.data;
+
+            if (users.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="table-loading">
+                            No users registered in the system. Use the form to add one.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = users.map(u => `
+                <tr>
+                    <td style="font-weight: 600; color: var(--text-muted);">#${u.userId}</td>
+                    <td style="font-weight: 600;">${escapeHtml(u.userName)}</td>
+                    <td style="color: var(--text-secondary);">${escapeHtml(u.email)}</td>
+                    <td style="text-align: center;">
+                        <a href="user-detail.html?id=${u.userId}" class="btn btn-secondary btn-sm" style="display: inline-flex;">
+                            <svg style="width: 14px; height: 14px; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                            View Tasks
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function handleAddUser(e) {
+            e.preventDefault();
+
+            // Client-side validations
+            const isNameValid = validateUserName();
+            const isEmailValid = validateEmail();
+
+            if (!isNameValid || !isEmailValid) {
+                return;
+            }
+
+            const userName = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const submitBtn = document.getElementById('submit-user-btn');
+
+            // Call API POST /api/users
+            const response = await apiFetch('/api/users', {
+                method: 'POST',
+                body: JSON.stringify({ userName, email }),
+                submitButton: submitBtn
+            });
+
+            if (response && response.success) {
+                showToast('success', 'User Created', `User "${userName}" was added successfully!`);
+                document.getElementById('add-user-form').reset();
+                loadUsers();
+            }
+        }
+    </script>
+</body>
+</html>
